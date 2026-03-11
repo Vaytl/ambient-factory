@@ -8,6 +8,7 @@ import { executeSession2 } from "./sessions/session2.js";
 import { addRejected } from "./storage/rejected.js";
 import { mergeScores } from "./storage/scores.js";
 import { writeResults } from "./services/output.js";
+import { createServer } from "./server.js";
 
 const program = new Command();
 
@@ -127,6 +128,42 @@ program
     console.log(`Rejected: ${session2Result.rejected.length} tracks`);
     console.log(`Average score: ${(session2Result.scores.reduce((s, x) => s + x.score, 0) / session2Result.scores.length).toFixed(1)}`);
     console.log(`Check output/ directory for results.`);
+  });
+
+program
+  .command("serve")
+  .description("Start HTTP API server")
+  .option("-p, --port <number>", "Port to listen on", "3003")
+  .action(async (opts) => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.error(
+        "Error: GEMINI_API_KEY not set. Create .env file or set environment variable."
+      );
+      process.exit(1);
+    }
+
+    initGemini(apiKey);
+
+    const port = parseInt(opts.port, 10);
+    const app = createServer();
+
+    app.listen(port, () => {
+      console.log(`\n=== AMBIENT FACTORY API ===`);
+      console.log(`Server running on http://localhost:${port}`);
+      console.log(`Model: gemini-3.1-flash-lite`);
+      console.log(`\nEndpoints:`);
+      console.log(`  POST /api/session1   — Run metadata selection`);
+      console.log(`  POST /api/session2   — Run audio audit + chain build`);
+      console.log(`  POST /api/build      — Run full pipeline`);
+      console.log(`  GET  /api/jobs       — List all jobs`);
+      console.log(`  GET  /api/jobs/:id   — Job status & result`);
+      console.log(`  GET  /api/rejected   — Rejected tracks list`);
+      console.log(`  DELETE /api/rejected/:id — Remove from rejected`);
+      console.log(`  GET  /api/scores     — Cumulative track scores`);
+      console.log(`  GET  /api/health     — Health check`);
+      console.log();
+    });
   });
 
 program.parse();
