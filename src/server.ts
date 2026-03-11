@@ -12,7 +12,7 @@ export function createServer() {
   app.get("/api/health", (_req, res) => {
     res.json({
       ok: true,
-      model: "gemini-3.1-flash-lite",
+      model: "gemini-3.1-flash-lite-preview",
       uptime: process.uptime(),
     });
   });

@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 
 let ai: GoogleGenAI;
 
-const MODEL = "gemini-3.1-flash-lite";
+const MODEL = "gemini-3.1-flash-lite-preview";
 
 export function initGemini(apiKey: string): void {
   ai = new GoogleGenAI({ apiKey });

@@ -151,7 +151,7 @@ program
     app.listen(port, () => {
       console.log(`\n=== AMBIENT FACTORY API ===`);
       console.log(`Server running on http://localhost:${port}`);
-      console.log(`Model: gemini-3.1-flash-lite`);
+      console.log(`Model: gemini-3.1-flash-lite-preview`);
       console.log(`\nEndpoints:`);
       console.log(`  POST /api/session1   — Run metadata selection`);
       console.log(`  POST /api/session2   — Run audio audit + chain build`);
