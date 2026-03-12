@@ -82,6 +82,41 @@ export async function batchUploadAudio(
 }
 
 /**
+ * Session 3: Send complete mix audio + chain metadata for QA audit.
+ * Multimodal request with 1 large audio file (2-3 hours).
+ */
+export async function runSession3(
+  systemPrompt: string,
+  mixFileRef: { uri: string; mimeType: string },
+  userPrompt: string
+): Promise<string> {
+  const parts: Array<
+    | { text: string }
+    | { fileData: { fileUri: string; mimeType: string } }
+  > = [];
+
+  // Attach the complete mix audio
+  parts.push({
+    fileData: { fileUri: mixFileRef.uri, mimeType: mixFileRef.mimeType },
+  });
+
+  // Then the text prompt with chain metadata
+  parts.push({ text: userPrompt });
+
+  const response = await ai.models.generateContent({
+    model: MODEL,
+    contents: [{ role: "user", parts }],
+    config: {
+      systemInstruction: systemPrompt,
+      temperature: 0.2,
+      responseMimeType: "application/json",
+    },
+  });
+
+  return response.text ?? "";
+}
+
+/**
  * Session 2: Send audio files + metadata, get audit + chain + FFmpeg.
  * Multimodal request with ~100 audio files.
  */

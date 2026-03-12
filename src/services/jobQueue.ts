@@ -1,7 +1,7 @@
 import { randomUUID } from "crypto";
 
 export type JobStatus = "pending" | "running" | "completed" | "failed";
-export type JobType = "session1" | "session2" | "build";
+export type JobType = "session1" | "session2" | "session3" | "build";
 
 export interface Job {
   id: string;

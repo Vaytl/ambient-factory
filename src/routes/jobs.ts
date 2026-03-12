@@ -3,9 +3,10 @@ import { createJob, getJob, getAllJobs, updateJob } from "../services/jobQueue.j
 import { loadDatabase } from "../services/database.js";
 import { executeSession1 } from "../sessions/session1.js";
 import { executeSession2 } from "../sessions/session2.js";
+import { executeSession3 } from "../sessions/session3.js";
 import { addRejected } from "../storage/rejected.js";
 import { mergeScores } from "../storage/scores.js";
-import { writeResults } from "../services/output.js";
+import { writeResults, writeSession3Report } from "../services/output.js";
 import type { Track } from "../types/index.js";
 
 export const jobsRouter = Router();
@@ -174,6 +175,47 @@ jobsRouter.post("/build", (req: Request, res: Response) => {
           session1: s1,
           session2: s2,
         },
+      });
+    } catch (err: any) {
+      updateJob(job.id, {
+        status: "failed",
+        error: err.message ?? String(err),
+      });
+    }
+  })();
+});
+
+// ─── POST /api/session3 ──────────────────────────────────────────────
+jobsRouter.post("/session3", (req: Request, res: Response) => {
+  const { task, mixPath, chain } = req.body;
+
+  if (!task || !mixPath || !chain || !Array.isArray(chain)) {
+    res.status(400).json({
+      error: "Missing required fields: task, mixPath, chain (array of ChainEntry)",
+    });
+    return;
+  }
+
+  const job = createJob("session3");
+  res.status(202).json({ jobId: job.id, status: job.status });
+
+  (async () => {
+    try {
+      updateJob(job.id, { status: "running", progress: "Uploading mix to Gemini..." });
+
+      const result = await executeSession3({
+        mixPath,
+        chain,
+        task,
+      });
+
+      // Save QA report
+      await writeSession3Report(result, task);
+
+      updateJob(job.id, {
+        status: "completed",
+        progress: `QA done: ${result.overallScore}/100 (${result.overallVerdict}), ${result.issues.length} issues`,
+        result,
       });
     } catch (err: any) {
       updateJob(job.id, {
