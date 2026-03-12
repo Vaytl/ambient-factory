@@ -1,23 +1,35 @@
 import { GoogleGenAI } from "@google/genai";
+import { waitIfNeeded, trackRequest } from "./rateLimiter.js";
 
 let ai: GoogleGenAI;
 
-const MODEL = "gemini-3.1-flash-lite-preview";
+/** Text-only model for Session 1 (metadata selection) */
+const MODEL_TEXT = "gemini-3.1-flash-lite-preview";
+
+/** Native audio model for Session 2 & 3 (audio analysis) */
+const MODEL_AUDIO = "gemini-2.5-flash-native-audio-latest";
 
 export function initGemini(apiKey: string): void {
   ai = new GoogleGenAI({ apiKey });
 }
 
+export function getModelNames() {
+  return { text: MODEL_TEXT, audio: MODEL_AUDIO };
+}
+
 /**
- * Session 1: Send JSON metadata, get selected track IDs.
- * Text-only request, ~300K tokens input.
+ * Session 1: Send TOON metadata, get selected track IDs.
+ * Text-only request — uses lightweight model.
  */
 export async function runSession1(
   systemPrompt: string,
   userPrompt: string
 ): Promise<string> {
+  const estimatedTokens = Math.ceil(userPrompt.length / 4);
+  await waitIfNeeded("generate", estimatedTokens);
+
   const response = await ai.models.generateContent({
-    model: MODEL,
+    model: MODEL_TEXT,
     contents: [{ role: "user", parts: [{ text: userPrompt }] }],
     config: {
       systemInstruction: systemPrompt,
@@ -25,6 +37,9 @@ export async function runSession1(
       responseMimeType: "application/json",
     },
   });
+
+  const tokensUsed = response.usageMetadata?.totalTokenCount ?? estimatedTokens;
+  await trackRequest("generate", tokensUsed);
 
   return response.text ?? "";
 }
@@ -36,10 +51,14 @@ export async function runSession1(
 export async function uploadAudio(
   filePath: string
 ): Promise<{ uri: string; mimeType: string }> {
+  await waitIfNeeded("upload");
+
   const file = await ai.files.upload({
     file: filePath,
     config: { mimeType: "audio/mpeg" },
   });
+
+  await trackRequest("upload");
 
   // Poll until file is ready
   let uploaded = file;
@@ -82,43 +101,8 @@ export async function batchUploadAudio(
 }
 
 /**
- * Session 3: Send complete mix audio + chain metadata for QA audit.
- * Multimodal request with 1 large audio file (2-3 hours).
- */
-export async function runSession3(
-  systemPrompt: string,
-  mixFileRef: { uri: string; mimeType: string },
-  userPrompt: string
-): Promise<string> {
-  const parts: Array<
-    | { text: string }
-    | { fileData: { fileUri: string; mimeType: string } }
-  > = [];
-
-  // Attach the complete mix audio
-  parts.push({
-    fileData: { fileUri: mixFileRef.uri, mimeType: mixFileRef.mimeType },
-  });
-
-  // Then the text prompt with chain metadata
-  parts.push({ text: userPrompt });
-
-  const response = await ai.models.generateContent({
-    model: MODEL,
-    contents: [{ role: "user", parts }],
-    config: {
-      systemInstruction: systemPrompt,
-      temperature: 0.2,
-      responseMimeType: "application/json",
-    },
-  });
-
-  return response.text ?? "";
-}
-
-/**
  * Session 2: Send audio files + metadata, get audit + chain + FFmpeg.
- * Multimodal request with ~100 audio files.
+ * Uses native audio model for accurate audio analysis.
  */
 export async function runSession2(
   systemPrompt: string,
@@ -140,8 +124,10 @@ export async function runSession2(
   // Then the text prompt with metadata
   parts.push({ text: userPrompt });
 
+  await waitIfNeeded("generate");
+
   const response = await ai.models.generateContent({
-    model: MODEL,
+    model: MODEL_AUDIO,
     contents: [{ role: "user", parts }],
     config: {
       systemInstruction: systemPrompt,
@@ -149,6 +135,49 @@ export async function runSession2(
       responseMimeType: "application/json",
     },
   });
+
+  const tokensUsed = response.usageMetadata?.totalTokenCount ?? 0;
+  await trackRequest("generate", tokensUsed);
+
+  return response.text ?? "";
+}
+
+/**
+ * Session 3: Send complete mix audio + chain metadata for QA audit.
+ * Uses native audio model for accurate listening.
+ */
+export async function runSession3(
+  systemPrompt: string,
+  mixFileRef: { uri: string; mimeType: string },
+  userPrompt: string
+): Promise<string> {
+  const parts: Array<
+    | { text: string }
+    | { fileData: { fileUri: string; mimeType: string } }
+  > = [];
+
+  // Attach the complete mix audio
+  parts.push({
+    fileData: { fileUri: mixFileRef.uri, mimeType: mixFileRef.mimeType },
+  });
+
+  // Then the text prompt with chain metadata
+  parts.push({ text: userPrompt });
+
+  await waitIfNeeded("generate");
+
+  const response = await ai.models.generateContent({
+    model: MODEL_AUDIO,
+    contents: [{ role: "user", parts }],
+    config: {
+      systemInstruction: systemPrompt,
+      temperature: 0.2,
+      responseMimeType: "application/json",
+    },
+  });
+
+  const tokensUsed = response.usageMetadata?.totalTokenCount ?? 0;
+  await trackRequest("generate", tokensUsed);
 
   return response.text ?? "";
 }

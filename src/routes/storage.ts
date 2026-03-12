@@ -4,6 +4,7 @@ import {
   saveRejected,
 } from "../storage/rejected.js";
 import { loadScores } from "../storage/scores.js";
+import { getStats as getRateLimitStats } from "../services/rateLimiter.js";
 
 export const storageRouter = Router();
 
@@ -44,4 +45,9 @@ storageRouter.get("/scores", async (_req: Request, res: Response) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ─── GET /api/rate-limits ───────────────────────────────────────────
+storageRouter.get("/rate-limits", (_req: Request, res: Response) => {
+  res.json(getRateLimitStats());
 });

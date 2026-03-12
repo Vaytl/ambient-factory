@@ -12,13 +12,21 @@ import type { Track } from "../types/index.js";
 export interface Session2Options {
   tracks: Track[];
   task: string;
-  targetDurationHours: number;
+  targetMinutes: number;
+  toleranceMinutes?: number;
 }
+
+const DEFAULT_TOLERANCE = 10;
 
 export async function executeSession2(
   opts: Session2Options
 ): Promise<Session2Response> {
-  const { tracks, task, targetDurationHours } = opts;
+  const {
+    tracks,
+    task,
+    targetMinutes,
+    toleranceMinutes = DEFAULT_TOLERANCE,
+  } = opts;
 
   // Upload all audio files via File API
   console.log(`[Session2] Uploading ${tracks.length} audio files...`);
@@ -40,6 +48,7 @@ export async function executeSession2(
   const tracksMeta = tracks.map((t) => ({
     id: t.id,
     name: t.name,
+    localPath: t.localPath,
     key: t.analysis.keyDetected,
     scale: t.analysis.scaleDetected,
     bpm: t.analysis.bpmDetected,
@@ -53,12 +62,16 @@ export async function executeSession2(
   const userPrompt = buildSession2UserPrompt(
     JSON.stringify(tracksMeta),
     task,
-    targetDurationHours
+    targetMinutes,
+    toleranceMinutes
   );
 
   // Call Gemini with audio + text
   console.log(
     `[Session2] Sending ${audioRefs.length} audio files + metadata to Gemini...`
+  );
+  console.log(
+    `[Session2] Target: ${targetMinutes} ± ${toleranceMinutes} min`
   );
   const rawResponse = await runSession2(
     SESSION2_SYSTEM_PROMPT,

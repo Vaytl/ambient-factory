@@ -1,6 +1,8 @@
 import express from "express";
 import { jobsRouter } from "./routes/jobs.js";
 import { storageRouter } from "./routes/storage.js";
+import { getModelNames } from "./services/gemini.js";
+import { getStats as getRateLimitStats } from "./services/rateLimiter.js";
 
 export function createServer() {
   const app = express();
@@ -10,10 +12,18 @@ export function createServer() {
 
   // Health check
   app.get("/api/health", (_req, res) => {
+    const models = getModelNames();
+    const rateStats = getRateLimitStats();
     res.json({
       ok: true,
-      model: "gemini-3.1-flash-lite-preview",
+      models,
       uptime: process.uptime(),
+      rateLimits: {
+        minuteRequestsUsed: rateStats.minute.requests,
+        minuteRequestsRemaining: rateStats.minute.remainingRequests,
+        dailyRequestsUsed: rateStats.daily.requests,
+        dailyRequestsRemaining: rateStats.daily.remainingRequests,
+      },
     });
   });
 

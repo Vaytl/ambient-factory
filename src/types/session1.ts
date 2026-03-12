@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const Session1ResponseSchema = z.object({
-  selectedTrackIds: z.array(z.string()).min(50).max(150),
+  selectedTrackIds: z.array(z.string()).min(5),
   reasoning: z.string(),
 });
 

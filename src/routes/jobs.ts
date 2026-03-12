@@ -7,13 +7,12 @@ import { executeSession3 } from "../sessions/session3.js";
 import { addRejected } from "../storage/rejected.js";
 import { mergeScores } from "../storage/scores.js";
 import { writeResults, writeSession3Report } from "../services/output.js";
-import type { Track } from "../types/index.js";
 
 export const jobsRouter = Router();
 
 // ─── POST /api/session1 ──────────────────────────────────────────────
 jobsRouter.post("/session1", (req: Request, res: Response) => {
-  const { task, hours = 2, databasePath } = req.body;
+  const { task, minutes = 120, databasePath } = req.body;
 
   if (!task || !databasePath) {
     res.status(400).json({ error: "Missing required fields: task, databasePath" });
@@ -34,7 +33,7 @@ jobsRouter.post("/session1", (req: Request, res: Response) => {
       const result = await executeSession1({
         tracks,
         task,
-        targetDurationHours: Number(hours),
+        targetMinutes: Number(minutes),
       });
 
       updateJob(job.id, {
@@ -53,7 +52,7 @@ jobsRouter.post("/session1", (req: Request, res: Response) => {
 
 // ─── POST /api/session2 ──────────────────────────────────────────────
 jobsRouter.post("/session2", (req: Request, res: Response) => {
-  const { task, hours = 2, databasePath, trackIds } = req.body;
+  const { task, minutes = 120, databasePath, trackIds } = req.body;
 
   if (!task || !databasePath || !trackIds || !Array.isArray(trackIds)) {
     res.status(400).json({
@@ -84,7 +83,7 @@ jobsRouter.post("/session2", (req: Request, res: Response) => {
       const result = await executeSession2({
         tracks: selectedTracks,
         task,
-        targetDurationHours: Number(hours),
+        targetMinutes: Number(minutes),
       });
 
       // Persist rejected + scores
@@ -114,7 +113,7 @@ jobsRouter.post("/session2", (req: Request, res: Response) => {
 
 // ─── POST /api/build (full pipeline) ─────────────────────────────────
 jobsRouter.post("/build", (req: Request, res: Response) => {
-  const { task, hours = 2, databasePath } = req.body;
+  const { task, minutes = 120, databasePath } = req.body;
 
   if (!task || !databasePath) {
     res.status(400).json({ error: "Missing required fields: task, databasePath" });
@@ -128,6 +127,7 @@ jobsRouter.post("/build", (req: Request, res: Response) => {
     try {
       updateJob(job.id, { status: "running", progress: "Loading database..." });
 
+      const targetMinutes = Number(minutes);
       const allTracks = await loadDatabase(databasePath);
       updateJob(job.id, { progress: `Loaded ${allTracks.length} tracks. Running Session 1...` });
 
@@ -135,7 +135,7 @@ jobsRouter.post("/build", (req: Request, res: Response) => {
       const s1 = await executeSession1({
         tracks: allTracks,
         task,
-        targetDurationHours: Number(hours),
+        targetMinutes,
       });
 
       updateJob(job.id, {
@@ -154,7 +154,7 @@ jobsRouter.post("/build", (req: Request, res: Response) => {
       const s2 = await executeSession2({
         tracks: selectedTracks,
         task,
-        targetDurationHours: Number(hours),
+        targetMinutes,
       });
 
       // Persist

@@ -1,7 +1,8 @@
 import "dotenv/config";
 import { Command } from "commander";
 import { readFile } from "fs/promises";
-import { initGemini } from "./services/gemini.js";
+import { initGemini, getModelNames } from "./services/gemini.js";
+import { loadRateUsage } from "./services/rateLimiter.js";
 import { loadDatabase } from "./services/database.js";
 import { executeSession1 } from "./sessions/session1.js";
 import { executeSession2 } from "./sessions/session2.js";
@@ -25,7 +26,7 @@ program
     "-t, --task <description>",
     'Task description, e.g. "deep sleep mix at 417 Hz"'
   )
-  .option("--hours <number>", "Target mix duration in hours", "2")
+  .option("-m, --minutes <number>", "Target mix duration in minutes", "120")
   .option("--skip-session1", "Skip Session 1, use previously saved selection")
   .option(
     "--selection <path>",
@@ -41,11 +42,14 @@ program
     }
 
     initGemini(apiKey);
+    await loadRateUsage();
 
-    const targetHours = parseFloat(opts.hours);
+    const targetMinutes = parseInt(opts.minutes, 10);
+    const models = getModelNames();
     console.log(`\n=== AMBIENT FACTORY ===`);
     console.log(`Task: ${opts.task}`);
-    console.log(`Duration: ${targetHours}h`);
+    console.log(`Duration: ${targetMinutes} min (±10 min tolerance)`);
+    console.log(`Models: text=${models.text}, audio=${models.audio}`);
     console.log();
 
     // Load database
@@ -67,7 +71,7 @@ program
       const session1Result = await executeSession1({
         tracks: allTracks,
         task: opts.task,
-        targetDurationHours: targetHours,
+        targetMinutes,
       });
       selectedIds = session1Result.selectedTrackIds;
 
@@ -100,7 +104,7 @@ program
     const session2Result = await executeSession2({
       tracks: selectedTracks,
       task: opts.task,
-      targetDurationHours: targetHours,
+      targetMinutes,
     });
 
     // Persist rejected tracks (forever)
@@ -144,24 +148,28 @@ program
     }
 
     initGemini(apiKey);
+    await loadRateUsage();
 
     const port = parseInt(opts.port, 10);
+    const models = getModelNames();
     const app = createServer();
 
     app.listen(port, () => {
       console.log(`\n=== AMBIENT FACTORY API ===`);
       console.log(`Server running on http://localhost:${port}`);
-      console.log(`Model: gemini-3.1-flash-lite-preview`);
+      console.log(`Models: text=${models.text}, audio=${models.audio}`);
       console.log(`\nEndpoints:`);
-      console.log(`  POST /api/session1   — Run metadata selection`);
-      console.log(`  POST /api/session2   — Run audio audit + chain build`);
-      console.log(`  POST /api/build      — Run full pipeline`);
-      console.log(`  GET  /api/jobs       — List all jobs`);
-      console.log(`  GET  /api/jobs/:id   — Job status & result`);
-      console.log(`  GET  /api/rejected   — Rejected tracks list`);
+      console.log(`  POST /api/session1      — Run metadata selection`);
+      console.log(`  POST /api/session2      — Run audio audit + chain build`);
+      console.log(`  POST /api/session3      — QA audit of final mix`);
+      console.log(`  POST /api/build         — Run full pipeline`);
+      console.log(`  GET  /api/jobs          — List all jobs`);
+      console.log(`  GET  /api/jobs/:id      — Job status & result`);
+      console.log(`  GET  /api/rejected      — Rejected tracks list`);
       console.log(`  DELETE /api/rejected/:id — Remove from rejected`);
-      console.log(`  GET  /api/scores     — Cumulative track scores`);
-      console.log(`  GET  /api/health     — Health check`);
+      console.log(`  GET  /api/scores        — Cumulative track scores`);
+      console.log(`  GET  /api/rate-limits   — API rate limit stats`);
+      console.log(`  GET  /api/health        — Health check`);
       console.log();
     });
   });
