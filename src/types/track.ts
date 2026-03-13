@@ -21,7 +21,9 @@ export const TrackAnalysisSchema = z.object({
   mlMoodAggressive: z.number().optional(),
   mlDanceability: z.number(),
   mlInstrumental: z.number().optional(),
-  mlGenres: z.array(z.string()).optional(),
+  mlGenres: z
+    .array(z.union([z.string(), z.object({ label: z.string(), score: z.number() })]))
+    .optional(),
 });
 
 export const TrackSchema = z.object({

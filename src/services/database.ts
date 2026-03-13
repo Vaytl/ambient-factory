@@ -9,7 +9,25 @@ import { getRejectedIds } from "../storage/rejected.js";
  */
 export async function loadDatabase(dbPath: string): Promise<Track[]> {
   const raw = await readFile(dbPath, "utf-8");
-  const data: unknown[] = JSON.parse(raw);
+  const parsed: unknown = JSON.parse(raw);
+
+  // Support both formats: plain array [...] and wrapped { tracks: [...] }
+  let data: unknown[];
+  if (Array.isArray(parsed)) {
+    data = parsed;
+  } else if (
+    parsed !== null &&
+    typeof parsed === "object" &&
+    "tracks" in parsed &&
+    Array.isArray((parsed as Record<string, unknown>).tracks)
+  ) {
+    data = (parsed as Record<string, unknown>).tracks as unknown[];
+    console.log(`[DB] Detected wrapped format with ${data.length} tracks in "tracks" field`);
+  } else {
+    throw new Error(
+      `Invalid database format: expected JSON array or object with "tracks" array`
+    );
+  }
 
   const tracks: Track[] = [];
   let errorCount = 0;
