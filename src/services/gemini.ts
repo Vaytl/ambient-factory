@@ -6,8 +6,8 @@ let ai: GoogleGenAI;
 /** Text-only model for Session 1 (metadata selection) */
 const MODEL_TEXT = "gemini-3.1-flash-lite-preview";
 
-/** Native audio model for Session 2 & 3 (audio analysis) */
-const MODEL_AUDIO = "gemini-2.5-flash-native-audio-latest";
+/** Multimodal model for Session 2 & 3 (audio analysis via File API) */
+const MODEL_AUDIO = "gemini-2.5-flash";
 
 export function initGemini(apiKey: string): void {
   ai = new GoogleGenAI({ apiKey });
@@ -101,29 +101,16 @@ export async function batchUploadAudio(
 }
 
 /**
- * Session 2: Send audio files + metadata, get audit + chain + FFmpeg.
- * Uses native audio model for accurate audio analysis.
+ * Session 2: Send interleaved audio+label parts, get audit + chain + FFmpeg.
+ * Parts are pre-built by session2.ts: [label1][audio1][label2][audio2]...[userPrompt]
  */
 export async function runSession2(
   systemPrompt: string,
-  audioRefs: { uri: string; mimeType: string }[],
-  userPrompt: string
-): Promise<string> {
-  const parts: Array<
+  parts: Array<
     | { text: string }
     | { fileData: { fileUri: string; mimeType: string } }
-  > = [];
-
-  // Attach all audio files first
-  for (const ref of audioRefs) {
-    parts.push({
-      fileData: { fileUri: ref.uri, mimeType: ref.mimeType },
-    });
-  }
-
-  // Then the text prompt with metadata
-  parts.push({ text: userPrompt });
-
+  >
+): Promise<string> {
   await waitIfNeeded("generate");
 
   const response = await ai.models.generateContent({

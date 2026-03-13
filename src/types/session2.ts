@@ -9,7 +9,7 @@ export const TrackScoreSchema = z.object({
 export const RejectedTrackSchema = z.object({
   id: z.string(),
   reason: z.string(),
-  rejectedAt: z.string(),
+  rejectedAt: z.string().optional(),
 });
 
 export const ChainEntrySchema = z.object({
@@ -17,6 +17,7 @@ export const ChainEntrySchema = z.object({
   trackId: z.string(),
   trackName: z.string(),
   crossfadeDuration: z.number(),
+  crossfadeCurve: z.string(),
   volumeAdjustDb: z.number(),
   keyDetected: z.string(),
   bpmDetected: z.number(),
@@ -24,7 +25,8 @@ export const ChainEntrySchema = z.object({
 });
 
 export const Session2ResponseSchema = z.object({
-  chain: z.array(ChainEntrySchema).min(20).max(60),
+  mixingStrategy: z.string(),
+  chain: z.array(ChainEntrySchema).min(5),
   rejected: z.array(RejectedTrackSchema),
   scores: z.array(TrackScoreSchema),
   ffmpegCommand: z.string(),

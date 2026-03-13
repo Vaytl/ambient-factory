@@ -48,6 +48,7 @@ export async function writeResults(
   const summary = {
     timestamp: ts,
     task: taskName,
+    mixingStrategy: result.mixingStrategy,
     chainLength: result.chain.length,
     rejectedCount: result.rejected.length,
     scoredCount: result.scores.length,
